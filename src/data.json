@@ -1,0 +1,35 @@
+{
+	"Name": "User",
+	"Symptoms": [
+		{
+			"Id": "fatigue",
+			"Name": "Fatigue",
+			"HigherBetter": false,
+			"Weight": 0.7
+		},
+		{
+			"Id": "sensory-overload",
+			"Name": "Sensory overload",
+			"HigherBetter": false,
+			"Weight": 1
+		},
+		{
+			"Id": "muscle-weakness",
+			"Name": "Muscle weakness",
+			"HigherBetter": false,
+			"Weight": 0.8
+		},
+		{
+			"Id": "brain-fog",
+			"Name": "Brain fog",
+			"HigherBetter": false,
+			"Weight": 0.5
+		},
+		{
+			"Id": "mood",
+			"Name": "Mood",
+			"HigherBetter": true,
+			"Weight": 0.3
+		}
+	]
+}
