@@ -31,5 +31,15 @@
 			"HigherBetter": true,
 			"Weight": 0.3
 		}
+	],
+	"Actions": [
+		{
+			"Name": "Sleep",
+			"Scores": [1, 2]
+		},
+		{
+			"Name": "Light Exercise",
+			"Scores": [8, 9, 10]
+		}
 	]
 }
