@@ -1,5 +1,16 @@
 ﻿using Newtonsoft.Json;
 using System.Diagnostics;
+using System.Text;
+using Terminal.Gui.App;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
+
+using IApplication app = Application.Create();
+app.Init();
+
+var window = new Window {
+	Title = "Symptom Tracker (Esc to quit)",
+};
 
 // Setup
 var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "symptom-tracker");
@@ -24,53 +35,74 @@ foreach(var s in data.Symptoms) {
 	symptomMap.Add(s.Id, s);
 }
 
-// Initial user prompt
+//UI Setup
 var date = DateTime.Today.ToString("yyyy-MM-dd");
-Console.WriteLine($"Hello {data.Name}, today's date is {date}. What would you like to do?\n");
-Console.WriteLine($"1. Track my symptoms");
-Console.WriteLine($"2. See today's report");
-Console.WriteLine($"3. Edit daily note");
-Console.WriteLine($"4. See report from a previous day");
-Console.WriteLine($"5. My Symptoms");
-Console.WriteLine($"6. My Suggested Actions");
-var answer = string.Empty;
-var answerNumber = -1;
-while (string.IsNullOrWhiteSpace(answer)) {
-	answer = Console.ReadLine();
-	if (!int.TryParse(answer, out answerNumber)) {
-		Console.WriteLine("Please input the option number only.");
-		answer = string.Empty;
-		continue;
-	}
-	if (answerNumber < 1 || answerNumber > 6) {
-		Console.WriteLine("Invalid option.");
-		answer = string.Empty;
-		continue;
-	}
-}
-switch(answerNumber) {
-	case 2:
-		var today = DateOnly.FromDateTime(DateTime.Today);
-		generateReport(today);
-		break;
-	case 3: 
-		var notePath = Path.Combine(notesPath, $"{date}.md");
-		if (!File.Exists(notePath))
-			File.Create(notePath);
-		new Process {
-			StartInfo = new ProcessStartInfo(notePath) {
-				UseShellExecute = true,
-			}
-		}.Start();
-		break;
-	case 4:
-		Console.WriteLine($"Please enter the day (eg {date})");
-		var a = Console.ReadLine();
-		if (a is null)
-			throw new Exception("Error, please provide a date string");
-		var d = DateOnly.Parse(a);
-		generateReport(d);
-		break;
+var mainElements = new List<View>();
+var childElements = new List<View>();
+
+var lDate = new Label() {
+	Text = $"Hello {data.Name}, today's date is {date}. What would you like to do?\n",
+	Y = 1,
+};
+mainElements.Add(lDate);
+
+var bTrack = createMainButton("Track Symptoms", 3);
+var bTodaysReport = createMainButton("See Today's Report", 4);
+var bNote = createMainButton("Edit Daily Note", 5);
+var bPreviousDays = createMainButton("View Previous Days", 6);
+var bSymptoms = createMainButton("My Symptoms", 7);
+var bActions = createMainButton("My Suggested Actions", 8);
+
+// bTrack.Accepting += (s, e) => {
+// 	foreach (var element in mainElements)
+// 		window.Remove(element);
+// 	e.Handled = true;
+// };
+
+bTodaysReport.Accepting += (s, e) => {
+	foreach (var element in mainElements)
+		window.Remove(element);
+	var today = DateOnly.FromDateTime(DateTime.Today);
+ 	generateReport(today);
+	e.Handled = true;
+};
+
+foreach (var e in mainElements)
+	window.Add(e);
+
+app.Run(window);
+
+// // Initial user prompt
+//
+// switch(answerNumber) {
+// 	case 3: 
+// 		var notePath = Path.Combine(notesPath, $"{date}.md");
+// 		if (!File.Exists(notePath))
+// 			File.Create(notePath);
+// 		new Process {
+// 			StartInfo = new ProcessStartInfo(notePath) {
+// 				UseShellExecute = true,
+// 			}
+// 		}.Start();
+// 		break;
+// 	case 4:
+// 		Console.WriteLine($"Please enter the day (eg {date})");
+// 		var a = Console.ReadLine();
+// 		if (a is null)
+// 			throw new Exception("Error, please provide a date string");
+// 		var d = DateOnly.Parse(a);
+// 		generateReport(d);
+// 		break;
+// }
+
+Button createMainButton(string text, int y) {
+	var b = new Button() {
+		Text = text,
+		Y = y,
+		HotKeySpecifier = (Rune)0xffff,
+	};
+	mainElements.Add(b);
+	return b;
 }
 
 void generateReport(DateOnly d) {
@@ -79,12 +111,20 @@ void generateReport(DateOnly d) {
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
 	if (day is null || day.TrackedSymptoms is null || !day.TrackedSymptoms.Any())
 		throw new Exception("No submission found for this day");
-	Console.WriteLine("Here are your symptom submissions.");
+	childElements.Add(new Label {
+		Title = "Here are your symptom submissions.",
+		Y = 1,
+	});
 	double total = 0;
 	double weightSum = 0;
-	foreach(var t in day.TrackedSymptoms) {
+	var i = 0;
+	for (i = 0; i < day.TrackedSymptoms.Count; i++) {
+		var t = day.TrackedSymptoms[i];
 		var s = symptomMap[t.Id];
-		Console.WriteLine($"{s.Name}: {t.Value}");
+		childElements.Add(new Label {
+			Title = $"{s.Name}: {t.Value}",
+			Y = i + 3,
+		});
 		double v = t.Value;
 		if (!s.HigherBetter)
 			v = 10 - v;
@@ -94,7 +134,12 @@ void generateReport(DateOnly d) {
 	}
 	total /= weightSum;
 	total = Math.Round(total, 1);
-	Console.WriteLine($"Your overall score is {total}");
+	childElements.Add(new Label {
+		Title = $"Your overall score is {total}",
+		Y = i + 4,
+	});
+	foreach (var e in childElements)
+		window.Add(e);
 }
 
 class Data {
@@ -125,3 +170,4 @@ class Action {
 	required public string Name { get; set; }
 	required public List<int> Scores { get; set; }
 }
+
