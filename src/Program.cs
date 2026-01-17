@@ -53,38 +53,50 @@ var bPreviousDays = createMainButton("View Previous Days", 6);
 var bSymptoms = createMainButton("My Symptoms", 7);
 var bActions = createMainButton("My Suggested Actions", 8);
 
-// bTrack.Accepting += (s, e) => {
-// 	foreach (var element in mainElements)
-// 		window.Remove(element);
-// 	e.Handled = true;
-// };
-
 bTodaysReport.Accepting += (s, e) => {
-	foreach (var element in mainElements)
-		window.Remove(element);
+	clearMainScreen();
 	var today = DateOnly.FromDateTime(DateTime.Today);
  	generateReport(today);
 	e.Handled = true;
 };
 
-foreach (var e in mainElements)
-	window.Add(e);
+bNote.Accepting += (s, e) => {
+	clearMainScreen();
+	var notePath = Path.Combine(notesPath, $"{date}.md");
+	if (!File.Exists(notePath))
+		File.Create(notePath);
+	var noteText= File.ReadAllText(notePath);
+	var editor = new TextView {
+		Text = noteText,
+		X = 0,
+		Y = 0,
+		Width = Dim.Fill(),
+		Height = Dim.Fill() - 2,
+	};
+	childElements.Add(editor);
+	var saveButton = new Button {
+		Text = "Save",
+		Y = Pos.Bottom(editor),
+	};
+	saveButton.Accepting += (s, e) => {
+		File.WriteAllText(notePath, editor.Text);
+		e.Handled = true;
+	};
+	childElements.Add(saveButton);
+	var backButton = createBackButton();
+	backButton.Y = Pos.Bottom(editor);
+	backButton.X = Pos.Right(saveButton);
+	showChildElements();
+	e.Handled = true;
+};
+
+showMainScreen();
 
 app.Run(window);
 
 // // Initial user prompt
 //
 // switch(answerNumber) {
-// 	case 3: 
-// 		var notePath = Path.Combine(notesPath, $"{date}.md");
-// 		if (!File.Exists(notePath))
-// 			File.Create(notePath);
-// 		new Process {
-// 			StartInfo = new ProcessStartInfo(notePath) {
-// 				UseShellExecute = true,
-// 			}
-// 		}.Start();
-// 		break;
 // 	case 4:
 // 		Console.WriteLine($"Please enter the day (eg {date})");
 // 		var a = Console.ReadLine();
@@ -95,6 +107,33 @@ app.Run(window);
 // 		break;
 // }
 
+void showElements(List<View> elements) {
+	foreach (var e in elements)
+		window.Add(e);
+}
+
+void clearElements(List<View> elements) {
+	foreach (var e in elements)
+		window.Remove(e);
+}
+
+void showMainScreen() {
+	showElements(mainElements);
+}
+
+void clearMainScreen() {
+	clearElements(mainElements);
+}
+
+void showChildElements() {
+	showElements(childElements);
+}
+
+void clearChildElements() {
+	clearElements(childElements);
+	childElements.Clear();
+}
+
 Button createMainButton(string text, int y) {
 	var b = new Button() {
 		Text = text,
@@ -103,6 +142,18 @@ Button createMainButton(string text, int y) {
 	};
 	mainElements.Add(b);
 	return b;
+}
+
+Button createBackButton() {
+	var backButton = new Button {
+		Text = "Back",
+	};
+	childElements.Add(backButton);
+	backButton.Accepting += (s, e) => {
+		clearChildElements();
+		showMainScreen();
+	};
+	return backButton;
 }
 
 void generateReport(DateOnly d) {
@@ -138,8 +189,9 @@ void generateReport(DateOnly d) {
 		Title = $"Your overall score is {total}",
 		Y = i + 4,
 	});
-	foreach (var e in childElements)
-		window.Add(e);
+	var backButton = createBackButton();
+	backButton.Y = i + 6;
+	showChildElements();
 }
 
 class Data {
