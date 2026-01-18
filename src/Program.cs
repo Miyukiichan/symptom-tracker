@@ -63,9 +63,11 @@ bTodaysReport.Accepting += (s, e) => {
 bNote.Accepting += (s, e) => {
 	clearMainScreen();
 	var notePath = Path.Combine(notesPath, $"{date}.md");
+	var noteText = string.Empty;
 	if (!File.Exists(notePath))
 		File.Create(notePath);
-	var noteText= File.ReadAllText(notePath);
+	else
+		noteText= File.ReadAllText(notePath);
 	var editor = new TextView {
 		Text = noteText,
 		X = 0,
@@ -152,6 +154,7 @@ Button createBackButton() {
 	backButton.Accepting += (s, e) => {
 		clearChildElements();
 		showMainScreen();
+		e.Handled = true;
 	};
 	return backButton;
 }
