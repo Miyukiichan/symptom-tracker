@@ -54,6 +54,70 @@ var bPreviousDays = createMainButton("View Previous Days", 6);
 var bSymptoms = createMainButton("My Symptoms", 7);
 var bActions = createMainButton("My Suggested Actions", 8);
 
+bTrack.Accepting += (s, e) => {
+	clearMainScreen();
+	var labelWidth = data.Symptoms.Select(x => x.Name.Count()).Max() + 1;
+	var selectorMap = new Dictionary<string, OptionSelector>();
+	var day = data.Days.FirstOrDefault(x => x.Date == today);
+	if (day is null) {
+		day = new Day {
+			Date = today,
+		};
+		data.Days.Add(day);
+	}
+	if (day.TrackedSymptoms is null)
+		day.TrackedSymptoms = new List<TrackedSymptom>();
+	for (var i = 0; i < data.Symptoms.Count; i++) {
+		var symptom = data.Symptoms[i];
+		var initialValue = 1;
+		if (day.TrackedSymptoms.Any()) {
+			var t = day.TrackedSymptoms.FirstOrDefault(x => x.Id == symptom.Id);
+			if (t is not null)
+				initialValue = t.Value;
+		}
+		var label = new Label {
+			Text = symptom.Name,
+			Y = i,
+		};
+		childElements.Add(label);
+		var selector = new OptionSelector {
+			Labels = new List<string> {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
+			Y = i,
+			X = labelWidth,
+			Orientation = Orientation.Horizontal,
+			Value = initialValue,
+		};
+		selectorMap.Add(symptom.Id, selector);
+		childElements.Add(selector);
+	}
+	var submitButton = createButton("Submit");
+	submitButton.Y = data.Symptoms.Count + 1;
+	submitButton.Accepting += (s, e) => {
+		foreach (var entry in selectorMap) {
+			var tracked = day.TrackedSymptoms.FirstOrDefault(x => x.Id == entry.Key);
+			if (tracked is null) {
+				tracked = new TrackedSymptom {
+					Id = entry.Key,
+					Value = entry.Value.Value.GetValueOrDefault(),
+				};
+				day.TrackedSymptoms.Add(tracked);
+			}
+			else {
+				tracked.Value = entry.Value.Value.GetValueOrDefault();
+			}
+		}
+		File.WriteAllText(dataPath, JsonConvert.SerializeObject(data, Formatting.Indented));
+		generateReport(today);
+		e.Handled = true;
+	};
+
+	var backButton = createBackButton();
+	backButton.Y = data.Symptoms.Count + 1;
+	backButton.X = Pos.Right(submitButton);
+	showChildElements();
+	e.Handled = true;
+};
+
 bTodaysReport.Accepting += (s, e) => {
 	clearMainScreen();
  	generateReport(today);
@@ -130,9 +194,19 @@ Button createMainButton(string text, int y) {
 	return b;
 }
 
+Button createButton(string text) {
+	var b = new Button {
+		Text = text,
+		HotKeySpecifier = (Rune)0xffff,
+	};
+	childElements.Add(b);
+	return b;
+}
+
 Button createBackButton() {
 	var backButton = new Button {
 		Text = "Back",
+		HotKeySpecifier = (Rune)0xffff,
 	};
 	childElements.Add(backButton);
 	backButton.Accepting += (s, e) => {
@@ -186,10 +260,8 @@ void generateReport(DateOnly d) {
 		Title = $"Your overall score is {total}",
 		Y = count + 4,
 	});
-	var noteButton = new Button {
-		Text = "Edit Note",
-		Y = count + 6,
-	};
+	var noteButton = createButton("Edit Note");
+	noteButton.Y = count + 6;
 	childElements.Add(noteButton);
 	noteButton.Accepting += (s, e) => {
 		clearChildElements();
@@ -216,10 +288,8 @@ void showNote(DateOnly d) {
 		Height = Dim.Fill() - 2,
 	};
 	childElements.Add(editor);
-	var saveButton = new Button {
-		Text = "Save",
-		Y = Pos.Bottom(editor),
-	};
+	var saveButton = createButton("Save");
+	saveButton.Y = Pos.Bottom(editor);
 	saveButton.Accepting += (s, e) => {
 		File.WriteAllText(notePath, editor.Text);
 		e.Handled = true;
