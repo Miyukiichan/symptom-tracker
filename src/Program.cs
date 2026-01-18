@@ -36,6 +36,7 @@ foreach(var s in data.Symptoms) {
 }
 
 //UI Setup
+var today = DateOnly.FromDateTime(DateTime.Today);
 var date = DateTime.Today.ToString("yyyy-MM-dd");
 var mainElements = new List<View>();
 var childElements = new List<View>();
@@ -55,40 +56,13 @@ var bActions = createMainButton("My Suggested Actions", 8);
 
 bTodaysReport.Accepting += (s, e) => {
 	clearMainScreen();
-	var today = DateOnly.FromDateTime(DateTime.Today);
  	generateReport(today);
 	e.Handled = true;
 };
 
 bNote.Accepting += (s, e) => {
 	clearMainScreen();
-	var notePath = Path.Combine(notesPath, $"{date}.md");
-	var noteText = string.Empty;
-	if (!File.Exists(notePath))
-		File.Create(notePath);
-	else
-		noteText= File.ReadAllText(notePath);
-	var editor = new TextView {
-		Text = noteText,
-		X = 0,
-		Y = 0,
-		Width = Dim.Fill(),
-		Height = Dim.Fill() - 2,
-	};
-	childElements.Add(editor);
-	var saveButton = new Button {
-		Text = "Save",
-		Y = Pos.Bottom(editor),
-	};
-	saveButton.Accepting += (s, e) => {
-		File.WriteAllText(notePath, editor.Text);
-		e.Handled = true;
-	};
-	childElements.Add(saveButton);
-	var backButton = createBackButton();
-	backButton.Y = Pos.Bottom(editor);
-	backButton.X = Pos.Right(saveButton);
-	showChildElements();
+	showNote(today);
 	e.Handled = true;
 };
 
@@ -106,6 +80,11 @@ bPreviousDays.Accepting += (s, e) => {
 			{ "Score", (d) => calculateScore(d.Date) },
 		}
 	);
+	table.CellActivated += (s, e) => {
+		var index = e.Row;
+		var date = (DateOnly)table.Table[index, 0];
+		generateReport(date);
+	};
 	childElements.Add(table);
 	showChildElements();
 	e.Handled = true;
@@ -113,19 +92,6 @@ bPreviousDays.Accepting += (s, e) => {
 
 showMainScreen();
 app.Run(window);
-
-// // Initial user prompt
-//
-// switch(answerNumber) {
-// 	case 4:
-// 		Console.WriteLine($"Please enter the day (eg {date})");
-// 		var a = Console.ReadLine();
-// 		if (a is null)
-// 			throw new Exception("Error, please provide a date string");
-// 		var d = DateOnly.Parse(a);
-// 		generateReport(d);
-// 		break;
-// }
 
 void showElements(List<View> elements) {
 	foreach (var e in elements)
@@ -204,6 +170,7 @@ double calculateScore(DateOnly d) {
 }
 
 void generateReport(DateOnly d) {
+	clearChildElements();
 	if (data.Days is null)
 		throw new Exception("You don't have any days recorded.");
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
@@ -219,8 +186,48 @@ void generateReport(DateOnly d) {
 		Title = $"Your overall score is {total}",
 		Y = count + 4,
 	});
+	var noteButton = new Button {
+		Text = "Edit Note",
+		Y = count + 6,
+	};
+	childElements.Add(noteButton);
+	noteButton.Accepting += (s, e) => {
+		clearChildElements();
+		showNote(d);
+		e.Handled = true;
+	};
 	var backButton = createBackButton();
 	backButton.Y = count + 6;
+	backButton.X = Pos.Right(noteButton);
+	showChildElements();
+}
+
+void showNote(DateOnly d) {
+	var notePath = Path.Combine(notesPath, $"{d.ToString("yyyy-MM-dd")}.md");
+	var noteText = string.Empty;
+	Console.WriteLine(notePath);
+	if (!File.Exists(notePath))
+		File.Create(notePath);
+	else
+		noteText= File.ReadAllText(notePath);
+	var editor = new TextView {
+		Text = noteText,
+		Width = Dim.Fill(),
+		Height = Dim.Fill() - 2,
+	};
+	childElements.Add(editor);
+	var saveButton = new Button {
+		Text = "Save",
+		Y = Pos.Bottom(editor),
+	};
+	saveButton.Accepting += (s, e) => {
+		File.WriteAllText(notePath, editor.Text);
+		e.Handled = true;
+	};
+	childElements.Add(saveButton);
+	var backButton = createBackButton();
+	backButton.Y = Pos.Bottom(editor);
+	backButton.X = Pos.Right(saveButton);
 	showChildElements();
 }
 
