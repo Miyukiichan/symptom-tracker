@@ -92,8 +92,26 @@ bNote.Accepting += (s, e) => {
 	e.Handled = true;
 };
 
-showMainScreen();
+bPreviousDays.Accepting += (s, e) => {
+	if (data.Days is null || !data.Days.Any())
+		return;
+	clearMainScreen();
+	var table = new TableView() {
+		Width = Dim.Fill(),
+		Height = Dim.Fill() - 2,
+	};
+	table.Table = new EnumerableTableSource<Day>(data.Days,
+		new Dictionary<string, Func<Day, object>>() {
+			{ "Date", (d) => d.Date },
+			{ "Score", (d) => calculateScore(d.Date) },
+		}
+	);
+	childElements.Add(table);
+	showChildElements();
+	e.Handled = true;
+};
 
+showMainScreen();
 app.Run(window);
 
 // // Initial user prompt
@@ -159,16 +177,10 @@ Button createBackButton() {
 	return backButton;
 }
 
-void generateReport(DateOnly d) {
-	if (data.Days is null)
-		throw new Exception("You don't have any days recorded.");
+double calculateScore(DateOnly d) {
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
 	if (day is null || day.TrackedSymptoms is null || !day.TrackedSymptoms.Any())
 		throw new Exception("No submission found for this day");
-	childElements.Add(new Label {
-		Title = "Here are your symptom submissions.",
-		Y = 1,
-	});
 	double total = 0;
 	double weightSum = 0;
 	var i = 0;
@@ -188,12 +200,27 @@ void generateReport(DateOnly d) {
 	}
 	total /= weightSum;
 	total = Math.Round(total, 1);
+	return total;
+}
+
+void generateReport(DateOnly d) {
+	if (data.Days is null)
+		throw new Exception("You don't have any days recorded.");
+	var day = data.Days.FirstOrDefault(x => x.Date == d);
+	if (day is null || day.TrackedSymptoms is null || !day.TrackedSymptoms.Any())
+		throw new Exception("No submission found for this day");
+	childElements.Add(new Label {
+		Title = "Here are your symptom submissions.",
+		Y = 1,
+	});
+	var total = calculateScore(d);
+	var count = day.TrackedSymptoms.Count;
 	childElements.Add(new Label {
 		Title = $"Your overall score is {total}",
-		Y = i + 4,
+		Y = count + 4,
 	});
 	var backButton = createBackButton();
-	backButton.Y = i + 6;
+	backButton.Y = count + 6;
 	showChildElements();
 }
 
