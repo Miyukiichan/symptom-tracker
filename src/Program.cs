@@ -5,13 +5,6 @@ using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-using IApplication app = Application.Create();
-app.Init();
-
-var window = new Window {
-	Title = "Symptom Tracker (Esc to quit)",
-};
-
 // Setup
 var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "symptom-tracker");
 var dataFileName = "data.json";
@@ -36,10 +29,14 @@ foreach(var s in data.Symptoms) {
 }
 
 //UI Setup
+
+var window = new Window {
+	Title = "Symptom Tracker (Esc to quit)",
+};
+var pageHistory = new Stack<List<View>>();
 var today = DateOnly.FromDateTime(DateTime.Today);
 var date = DateTime.Today.ToString("yyyy-MM-dd");
 var mainElements = new List<View>();
-var childElements = new List<View>();
 
 var lDate = new Label() {
 	Text = $"Hello {data.Name}, today's date is {date}. What would you like to do?\n",
@@ -55,9 +52,11 @@ var bSymptoms = createMainButton("My Symptoms", 7);
 var bActions = createMainButton("My Suggested Actions", 8);
 
 bTrack.Accepting += (s, e) => {
-	clearMainScreen();
+	var elements = new List<View>();
 	var labelWidth = data.Symptoms.Select(x => x.Name.Count()).Max() + 1;
 	var selectorMap = new Dictionary<string, OptionSelector>();
+	if (data.Days is null)
+		data.Days = new List<Day>();
 	var day = data.Days.FirstOrDefault(x => x.Date == today);
 	if (day is null) {
 		day = new Day {
@@ -80,7 +79,7 @@ bTrack.Accepting += (s, e) => {
 			Text = symptom.Name,
 			Y = i,
 		};
-		childElements.Add(label);
+		elements.Add(label);
 		var selector = new OptionSelector {
 			Labels = new List<string> {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
 			Y = i,
@@ -89,9 +88,9 @@ bTrack.Accepting += (s, e) => {
 			Value = initialValue,
 		};
 		selectorMap.Add(symptom.Id, selector);
-		childElements.Add(selector);
+		elements.Add(selector);
 	}
-	var submitButton = createButton("Submit");
+	var submitButton = createButton("Submit", elements);
 	submitButton.Y = data.Symptoms.Count + 1;
 	submitButton.Accepting += (s, e) => {
 		foreach (var entry in selectorMap) {
@@ -115,25 +114,29 @@ bTrack.Accepting += (s, e) => {
 			}
 		}
 		File.WriteAllText(dataPath, JsonConvert.SerializeObject(data, Formatting.Indented));
-		generateReport(today);
+		var reportElements = new List<View>();
+		generateReport(today, reportElements);
+		//Ensure we don't return to the tracking screen - just go back to main menu
+		hideElements(pageHistory.Pop());
+		navigateForward(reportElements);
 		e.Handled = true;
 	};
 
-	var backButton = createBackButton();
+	var backButton = createBackButton(elements);
 	backButton.Y = data.Symptoms.Count + 1;
 	backButton.X = Pos.Right(submitButton);
-	showChildElements();
+	navigateForward(elements);
 	e.Handled = true;
 };
 
 bTodaysReport.Accepting += (s, e) => {
-	clearMainScreen();
- 	generateReport(today);
+	var elements = new List<View>();
+ 	generateReport(today, elements);
+	navigateForward(elements);
 	e.Handled = true;
 };
 
 bNote.Accepting += (s, e) => {
-	clearMainScreen();
 	showNote(today);
 	e.Handled = true;
 };
@@ -141,10 +144,12 @@ bNote.Accepting += (s, e) => {
 bPreviousDays.Accepting += (s, e) => {
 	if (data.Days is null || !data.Days.Any())
 		return;
-	clearMainScreen();
+	var elements = new List<View>();
+	var backButton = createBackButton(elements);
 	var table = new TableView() {
 		Width = Dim.Fill(),
 		Height = Dim.Fill() - 2,
+		Y = 1,
 	};
 	table.Table = new EnumerableTableSource<Day>(data.Days.OrderByDescending(x => x.Date),
 		new Dictionary<string, Func<Day, object>>() {
@@ -154,42 +159,43 @@ bPreviousDays.Accepting += (s, e) => {
 	);
 	table.CellActivated += (s, e) => {
 		var index = e.Row;
-		var date = (DateOnly)table.Table[index, 0];
-		generateReport(date);
+		var d = (DateOnly)table.Table[index, 0];
+		var reportElements = new List<View>();
+		generateReport(d, reportElements);
+		navigateForward(reportElements);
 	};
-	childElements.Add(table);
-	showChildElements();
+	elements.Add(table);
+	navigateForward(elements);
 	e.Handled = true;
 };
 
-showMainScreen();
+navigateForward(mainElements);
+using IApplication app = Application.Create();
+app.Init();
 app.Run(window);
+
+void navigateBack() {
+	if (!pageHistory.Any())
+		return;
+	hideElements(pageHistory.Pop());
+	showElements(pageHistory.Peek());
+}
+
+void navigateForward(List<View> elements) {
+	if (pageHistory.Any())
+		hideElements(pageHistory.Peek());
+	pageHistory.Push(elements);
+	showElements(elements);
+}
 
 void showElements(List<View> elements) {
 	foreach (var e in elements)
 		window.Add(e);
 }
 
-void clearElements(List<View> elements) {
+void hideElements(List<View> elements) {
 	foreach (var e in elements)
 		window.Remove(e);
-}
-
-void showMainScreen() {
-	showElements(mainElements);
-}
-
-void clearMainScreen() {
-	clearElements(mainElements);
-}
-
-void showChildElements() {
-	showElements(childElements);
-}
-
-void clearChildElements() {
-	clearElements(childElements);
-	childElements.Clear();
 }
 
 Button createMainButton(string text, int y) {
@@ -202,24 +208,25 @@ Button createMainButton(string text, int y) {
 	return b;
 }
 
-Button createButton(string text) {
+Button createButton(string text, List<View>? elements = null) {
 	var b = new Button {
 		Text = text,
 		HotKeySpecifier = (Rune)0xffff,
 	};
-	childElements.Add(b);
+	if (elements is not null)
+		elements.Add(b);
 	return b;
 }
 
-Button createBackButton() {
+Button createBackButton(List<View>? elements = null) {
 	var backButton = new Button {
 		Text = "Back",
 		HotKeySpecifier = (Rune)0xffff,
 	};
-	childElements.Add(backButton);
+	if (elements is not null)
+		elements.Add(backButton);
 	backButton.Accepting += (s, e) => {
-		clearChildElements();
-		showMainScreen();
+		navigateBack();
 		e.Handled = true;
 	};
 	return backButton;
@@ -246,47 +253,44 @@ double calculateScore(DateOnly d) {
 	return total;
 }
 
-void generateReport(DateOnly d) {
-	clearChildElements();
+void generateReport(DateOnly d, List<View> elements) {
 	if (data.Days is null)
 		throw new Exception("You don't have any days recorded.");
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
 	if (day is null || day.TrackedSymptoms is null || !day.TrackedSymptoms.Any())
 		throw new Exception("No submission found for this day");
 	day.TrackedSymptoms = day.TrackedSymptoms.OrderBy(x => symptomMap[x.Id].Name).ToList();
-	childElements.Add(new Label {
+	elements.Add(new Label {
 		Title = "Here are your symptom submissions.",
 		Y = 1,
 	});
 	for (var i = 0; i < day.TrackedSymptoms.Count; i++) {
 		var t = day.TrackedSymptoms[i];
 		var s = symptomMap[t.Id];
-		childElements.Add(new Label {
+		elements.Add(new Label {
 			Title = $"{s.Name}: {t.Value}",
 			Y = i + 3,
 		});
 	}
 	var total = calculateScore(d);
 	var count = day.TrackedSymptoms.Count;
-	childElements.Add(new Label {
+	elements.Add(new Label {
 		Title = $"Your overall score is {total}",
 		Y = count + 4,
 	});
-	var noteButton = createButton("Edit Note");
+	var noteButton = createButton("Edit Note", elements);
 	noteButton.Y = count + 6;
-	childElements.Add(noteButton);
 	noteButton.Accepting += (s, e) => {
-		clearChildElements();
 		showNote(d);
 		e.Handled = true;
 	};
-	var backButton = createBackButton();
+	var backButton = createBackButton(elements);
 	backButton.Y = count + 6;
 	backButton.X = Pos.Right(noteButton);
-	showChildElements();
 }
 
 void showNote(DateOnly d) {
+	var elements = new List<View>();
 	var notePath = Path.Combine(notesPath, $"{d.ToString("yyyy-MM-dd")}.md");
 	var noteText = string.Empty;
 	Console.WriteLine(notePath);
@@ -299,18 +303,17 @@ void showNote(DateOnly d) {
 		Width = Dim.Fill(),
 		Height = Dim.Fill() - 2,
 	};
-	childElements.Add(editor);
-	var saveButton = createButton("Save");
+	elements.Add(editor);
+	var saveButton = createButton("Save", elements);
 	saveButton.Y = Pos.Bottom(editor);
 	saveButton.Accepting += (s, e) => {
 		File.WriteAllText(notePath, editor.Text);
 		e.Handled = true;
 	};
-	childElements.Add(saveButton);
-	var backButton = createBackButton();
+	var backButton = createBackButton(elements);
 	backButton.Y = Pos.Bottom(editor);
 	backButton.X = Pos.Right(saveButton);
-	showChildElements();
+	navigateForward(elements);
 }
 
 class Data {
