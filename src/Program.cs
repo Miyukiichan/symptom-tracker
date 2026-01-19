@@ -67,6 +67,7 @@ bTrack.Accepting += (s, e) => {
 	if (day.TrackedSymptoms is null)
 		day.TrackedSymptoms = new List<TrackedSymptom>();
 	data.Symptoms = data.Symptoms.OrderBy(x => x.Name).ToList();
+	OptionSelector? firstSelector = null;
 	for (var i = 0; i < data.Symptoms.Count; i++) {
 		var symptom = data.Symptoms[i];
 		var initialValue = 0;
@@ -89,6 +90,8 @@ bTrack.Accepting += (s, e) => {
 		};
 		selectorMap.Add(symptom.Id, selector);
 		elements.Add(selector);
+		if (i == 0)
+			firstSelector = selector;
 	}
 	var submitButton = createButton("Submit", elements);
 	submitButton.Y = data.Symptoms.Count + 1;
@@ -115,29 +118,29 @@ bTrack.Accepting += (s, e) => {
 		}
 		File.WriteAllText(dataPath, JsonConvert.SerializeObject(data, Formatting.Indented));
 		var reportElements = new List<View>();
-		generateReport(today, reportElements);
+		generateReport(today, reportElements, bTrack);
 		//Ensure we don't return to the tracking screen - just go back to main menu
 		hideElements(pageHistory.Pop());
 		navigateForward(reportElements);
 		e.Handled = true;
 	};
 
-	var backButton = createBackButton(elements);
+	var backButton = createBackButton(elements, bTrack);
 	backButton.Y = data.Symptoms.Count + 1;
 	backButton.X = Pos.Right(submitButton);
-	navigateForward(elements);
+	navigateForward(elements, firstSelector);
 	e.Handled = true;
 };
 
 bTodaysReport.Accepting += (s, e) => {
 	var elements = new List<View>();
- 	generateReport(today, elements);
+ 	generateReport(today, elements, bTodaysReport);
 	navigateForward(elements);
 	e.Handled = true;
 };
 
 bNote.Accepting += (s, e) => {
-	showNote(today);
+	showNote(today, bNote);
 	e.Handled = true;
 };
 
@@ -145,7 +148,7 @@ bPreviousDays.Accepting += (s, e) => {
 	if (data.Days is null || !data.Days.Any())
 		return;
 	var elements = new List<View>();
-	var backButton = createBackButton(elements);
+	var backButton = createBackButton(elements, bPreviousDays);
 	var table = new TableView() {
 		Width = Dim.Fill(),
 		Height = Dim.Fill() - 2,
@@ -161,11 +164,11 @@ bPreviousDays.Accepting += (s, e) => {
 		var index = e.Row;
 		var d = (DateOnly)table.Table[index, 0];
 		var reportElements = new List<View>();
-		generateReport(d, reportElements);
+		generateReport(d, reportElements, table);
 		navigateForward(reportElements);
 	};
 	elements.Add(table);
-	navigateForward(elements);
+	navigateForward(elements, table);
 	e.Handled = true;
 };
 
@@ -174,23 +177,25 @@ using IApplication app = Application.Create();
 app.Init();
 app.Run(window);
 
-void navigateBack() {
+void navigateBack(View? elementToFocus = null) {
 	if (!pageHistory.Any())
 		return;
 	hideElements(pageHistory.Pop());
-	showElements(pageHistory.Peek());
+	showElements(pageHistory.Peek(), elementToFocus);
 }
 
-void navigateForward(List<View> elements) {
+void navigateForward(List<View> elements, View? elementToFocus = null) {
 	if (pageHistory.Any())
 		hideElements(pageHistory.Peek());
 	pageHistory.Push(elements);
-	showElements(elements);
+	showElements(elements, elementToFocus);
 }
 
-void showElements(List<View> elements) {
+void showElements(List<View> elements, View? elementToFocus = null) {
 	foreach (var e in elements)
 		window.Add(e);
+	if (elementToFocus is not null)
+		elementToFocus.SetFocus();
 }
 
 void hideElements(List<View> elements) {
@@ -218,7 +223,7 @@ Button createButton(string text, List<View>? elements = null) {
 	return b;
 }
 
-Button createBackButton(List<View>? elements = null) {
+Button createBackButton(List<View>? elements = null, View? elementToFocus = null) {
 	var backButton = new Button {
 		Text = "Back",
 		HotKeySpecifier = (Rune)0xffff,
@@ -226,7 +231,7 @@ Button createBackButton(List<View>? elements = null) {
 	if (elements is not null)
 		elements.Add(backButton);
 	backButton.Accepting += (s, e) => {
-		navigateBack();
+		navigateBack(elementToFocus);
 		e.Handled = true;
 	};
 	return backButton;
@@ -253,7 +258,7 @@ double calculateScore(DateOnly d) {
 	return total;
 }
 
-void generateReport(DateOnly d, List<View> elements) {
+void generateReport(DateOnly d, List<View> elements, View? backElementToFocus = null) {
 	if (data.Days is null)
 		throw new Exception("You don't have any days recorded.");
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
@@ -281,15 +286,15 @@ void generateReport(DateOnly d, List<View> elements) {
 	var noteButton = createButton("Edit Note", elements);
 	noteButton.Y = count + 6;
 	noteButton.Accepting += (s, e) => {
-		showNote(d);
+		showNote(d, noteButton);
 		e.Handled = true;
 	};
-	var backButton = createBackButton(elements);
+	var backButton = createBackButton(elements, backElementToFocus);
 	backButton.Y = count + 6;
 	backButton.X = Pos.Right(noteButton);
 }
 
-void showNote(DateOnly d) {
+void showNote(DateOnly d, View? backElementToFocus = null) {
 	var elements = new List<View>();
 	var notePath = Path.Combine(notesPath, $"{d.ToString("yyyy-MM-dd")}.md");
 	var noteText = string.Empty;
@@ -310,10 +315,10 @@ void showNote(DateOnly d) {
 		File.WriteAllText(notePath, editor.Text);
 		e.Handled = true;
 	};
-	var backButton = createBackButton(elements);
+	var backButton = createBackButton(elements, backElementToFocus);
 	backButton.Y = Pos.Bottom(editor);
 	backButton.X = Pos.Right(saveButton);
-	navigateForward(elements);
+	navigateForward(elements, editor);
 }
 
 class Data {
