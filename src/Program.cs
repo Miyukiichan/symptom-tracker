@@ -67,9 +67,10 @@ bTrack.Accepting += (s, e) => {
 	}
 	if (day.TrackedSymptoms is null)
 		day.TrackedSymptoms = new List<TrackedSymptom>();
+	data.Symptoms = data.Symptoms.OrderBy(x => x.Name).ToList();
 	for (var i = 0; i < data.Symptoms.Count; i++) {
 		var symptom = data.Symptoms[i];
-		var initialValue = 1;
+		var initialValue = 0;
 		if (day.TrackedSymptoms.Any()) {
 			var t = day.TrackedSymptoms.FirstOrDefault(x => x.Id == symptom.Id);
 			if (t is not null)
@@ -81,7 +82,7 @@ bTrack.Accepting += (s, e) => {
 		};
 		childElements.Add(label);
 		var selector = new OptionSelector {
-			Labels = new List<string> {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
+			Labels = new List<string> {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
 			Y = i,
 			X = labelWidth,
 			Orientation = Orientation.Horizontal,
@@ -95,15 +96,22 @@ bTrack.Accepting += (s, e) => {
 	submitButton.Accepting += (s, e) => {
 		foreach (var entry in selectorMap) {
 			var tracked = day.TrackedSymptoms.FirstOrDefault(x => x.Id == entry.Key);
+			var value = entry.Value.Value.GetValueOrDefault();
+			// Treat 0 as null entry
+			if (value == 0) {
+				if (tracked is not null)
+					day.TrackedSymptoms.Remove(tracked);
+				continue;
+			}
 			if (tracked is null) {
 				tracked = new TrackedSymptom {
 					Id = entry.Key,
-					Value = entry.Value.Value.GetValueOrDefault(),
+					Value = value,
 				};
 				day.TrackedSymptoms.Add(tracked);
 			}
 			else {
-				tracked.Value = entry.Value.Value.GetValueOrDefault();
+				tracked.Value = value;
 			}
 		}
 		File.WriteAllText(dataPath, JsonConvert.SerializeObject(data, Formatting.Indented));
@@ -138,7 +146,7 @@ bPreviousDays.Accepting += (s, e) => {
 		Width = Dim.Fill(),
 		Height = Dim.Fill() - 2,
 	};
-	table.Table = new EnumerableTableSource<Day>(data.Days,
+	table.Table = new EnumerableTableSource<Day>(data.Days.OrderByDescending(x => x.Date),
 		new Dictionary<string, Func<Day, object>>() {
 			{ "Date", (d) => d.Date },
 			{ "Score", (d) => calculateScore(d.Date) },
@@ -223,14 +231,9 @@ double calculateScore(DateOnly d) {
 		throw new Exception("No submission found for this day");
 	double total = 0;
 	double weightSum = 0;
-	var i = 0;
-	for (i = 0; i < day.TrackedSymptoms.Count; i++) {
+	for (var i = 0; i < day.TrackedSymptoms.Count; i++) {
 		var t = day.TrackedSymptoms[i];
 		var s = symptomMap[t.Id];
-		childElements.Add(new Label {
-			Title = $"{s.Name}: {t.Value}",
-			Y = i + 3,
-		});
 		double v = t.Value;
 		if (!s.HigherBetter)
 			v = 10 - v;
@@ -250,10 +253,19 @@ void generateReport(DateOnly d) {
 	var day = data.Days.FirstOrDefault(x => x.Date == d);
 	if (day is null || day.TrackedSymptoms is null || !day.TrackedSymptoms.Any())
 		throw new Exception("No submission found for this day");
+	day.TrackedSymptoms = day.TrackedSymptoms.OrderBy(x => symptomMap[x.Id].Name).ToList();
 	childElements.Add(new Label {
 		Title = "Here are your symptom submissions.",
 		Y = 1,
 	});
+	for (var i = 0; i < day.TrackedSymptoms.Count; i++) {
+		var t = day.TrackedSymptoms[i];
+		var s = symptomMap[t.Id];
+		childElements.Add(new Label {
+			Title = $"{s.Name}: {t.Value}",
+			Y = i + 3,
+		});
+	}
 	var total = calculateScore(d);
 	var count = day.TrackedSymptoms.Count;
 	childElements.Add(new Label {
