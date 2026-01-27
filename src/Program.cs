@@ -74,7 +74,7 @@ bTrack.Accepting += (s, e) => {
 		if (day.TrackedSymptoms.Any()) {
 			var t = day.TrackedSymptoms.FirstOrDefault(x => x.Id == symptom.Id);
 			if (t is not null)
-				initialValue = t.Value;
+				initialValue = t.Value + 1;
 		}
 		var label = new Label {
 			Text = symptom.Name,
@@ -82,7 +82,7 @@ bTrack.Accepting += (s, e) => {
 		};
 		elements.Add(label);
 		var selector = new OptionSelector {
-			Labels = new List<string> {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
+			Labels = new List<string> {"N/A", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"},
 			Y = i,
 			X = labelWidth,
 			Orientation = Orientation.Horizontal,
@@ -105,6 +105,8 @@ bTrack.Accepting += (s, e) => {
 					day.TrackedSymptoms.Remove(tracked);
 				continue;
 			}
+			// Convert to true numerical score offset by 1
+			value -= 1;
 			if (tracked is null) {
 				tracked = new TrackedSymptom {
 					Id = entry.Key,
