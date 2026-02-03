@@ -35,11 +35,14 @@ var window = new Window {
 };
 var pageHistory = new Stack<List<View>>();
 var today = DateOnly.FromDateTime(DateTime.Today);
-var date = DateTime.Today.ToString("yyyy-MM-dd");
+var date = DateTime.Today.ToString("dddd dd/MM/yyyy");
+var todayName = DateTime.Today.ToString("dddd");
+var offDayToday = data.OffDays.Contains(todayName);
+var onOff = offDayToday ? "OFF" : "ON";
 var mainElements = new List<View>();
 
 var lDate = new Label() {
-	Text = $"Hello {data.Name}, today's date is {date}. What would you like to do?\n",
+	Text = $"Hello {data.Name}, today is {date} and it is an {onOff} day. What would you like to do?\n",
 	Y = 1,
 };
 mainElements.Add(lDate);
@@ -158,15 +161,18 @@ bPreviousDays.Accepting += (s, e) => {
 	};
 	table.Table = new EnumerableTableSource<Day>(data.Days.OrderByDescending(x => x.Date),
 		new Dictionary<string, Func<Day, object>>() {
-			{ "Date", (d) => d.Date },
+			{ "Date", (d) => d.Date.ToString("ddd dd/MM/yyyy") },
 			{ "Score", (d) => calculateScore(d.Date) },
 		}
 	);
 	table.CellActivated += (s, e) => {
 		var index = e.Row;
-		var d = (DateOnly)table.Table[index, 0];
+		var d = table.Table[index, 0].ToString();
+		if (d is null)
+			return;
+		var dOnly = DateOnly.Parse(d);
 		var reportElements = new List<View>();
-		generateReport(d, reportElements, table);
+		generateReport(dOnly, reportElements, table);
 		navigateForward(reportElements);
 	};
 	elements.Add(table);
@@ -328,6 +334,7 @@ class Data {
 	required public List<Symptom> Symptoms { get; set; }
 	public List<Day>? Days { get; set; }
 	required public List<Action> Actions { get; set; }
+	required public List<string> OffDays { get; set; }
 }
 
 class Symptom {
@@ -349,6 +356,7 @@ class TrackedSymptom {
 
 class Action {
 	required public string Name { get; set; }
-	required public List<int> Scores { get; set; }
+	required public int MinScore { get; set; }
+	required public int MaxScore { get; set; }
 }
 

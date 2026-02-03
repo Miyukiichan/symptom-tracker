@@ -35,16 +35,16 @@
 	"Actions": [
 		{
 			"Name": "Sleep",
-			"Scores": [1, 2],
+			"MinScore": 1,
+			"MaxScore": 2,
 			"OffDay": true,
-			"WeatherDepending": false
 		},
 		{
 			"Name": "Light Exercise",
-			"Scores": [8, 9, 10],
+			"MinScore": 8,
+			"MaxScore": 10,
 			"OffDay": false,
-			"WeatherDepending": true
 		}
 	],
-	"OffDays": ["Wednesday", "Friday", "Saturday", "Sunday"]
+	"OffDays": ["Monday", "Wednesday", "Friday", "Saturday"]
 }
