@@ -9,13 +9,17 @@ using Terminal.Gui.Views;
 var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "symptom-tracker");
 var dataFileName = "data.json";
 var notesPath = Path.Combine(configPath, "notes");
+var exportPath = Path.Combine(configPath, "export");
 var dataPath = Path.Combine(configPath, dataFileName);
+var logPath = Path.Combine(configPath, "log.txt");
 if (!Directory.Exists(configPath))
 	Directory.CreateDirectory(configPath);
 if (!File.Exists(dataPath))
 	File.Copy(dataFileName, dataPath);
 if (!Directory.Exists(notesPath))
 	Directory.CreateDirectory(notesPath);
+if (!Directory.Exists(exportPath))
+	Directory.CreateDirectory(exportPath);
 
 // Read database
 var data = JsonConvert.DeserializeObject<Data>(File.ReadAllText(dataPath));
@@ -51,8 +55,9 @@ var bTrack = createMainButton("Track Symptoms", 3);
 var bTodaysReport = createMainButton("See Today's Report", 4);
 var bNote = createMainButton("Edit Daily Note", 5);
 var bPreviousDays = createMainButton("View Previous Days", 6);
-var bSymptoms = createMainButton("My Symptoms", 7);
-var bActions = createMainButton("My Suggested Actions", 8);
+var bExportCSV = createMainButton("Export to CSV", 7);
+var bSymptoms = createMainButton("My Symptoms", 8);
+var bActions = createMainButton("My Suggested Actions", 9);
 
 bTrack.Accepting += (s, e) => {
 	var elements = new List<View>();
@@ -177,6 +182,29 @@ bPreviousDays.Accepting += (s, e) => {
 	};
 	elements.Add(table);
 	navigateForward(elements, table);
+	e.Handled = true;
+};
+
+bExportCSV.Accepting += (s, e) => {
+	var exportFilePath = Path.Combine(exportPath, $"{DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")}.csv");
+	var columns = data.Symptoms.Select(x => x.Name).Distinct().OrderBy(x => x).ToList();
+	columns.Insert(0, "Date");
+	columns.Add("Score");
+	try {
+		using (var writer = new StreamWriter(exportFilePath)) {
+			writer.WriteLine(string.Join(",", columns));
+			foreach (var day in data.Days.OrderByDescending(x => x.Date)) {
+				// Make sure we join coming from the total symptoms so that anything that was not tracked will be treated as a blank string
+				var rowValues = data.Symptoms.OrderBy(x => x.Name).Select(x => day.TrackedSymptoms.FirstOrDefault(y => y.Id == x.Id)?.Value.ToString()).ToList();
+				rowValues.Insert(0, day.Date.ToString("dd/MM/yyyy"));
+				rowValues.Add(calculateScore(day.Date).ToString());
+				writer.WriteLine(string.Join(",", rowValues));
+			}
+		}
+	}
+	catch (Exception ex) {
+		log(ex.ToString());
+	}
 	e.Handled = true;
 };
 
@@ -327,6 +355,10 @@ void showNote(DateOnly d, View? backElementToFocus = null) {
 	backButton.Y = Pos.Bottom(editor);
 	backButton.X = Pos.Right(saveButton);
 	navigateForward(elements, editor);
+}
+
+void log(string msg) {
+	File.AppendAllText(logPath, msg + Environment.NewLine);
 }
 
 class Data {
