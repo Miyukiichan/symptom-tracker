@@ -61,6 +61,9 @@ var bExportCSV = createMainButton("Export to CSV", 7);
 var bSymptoms = createMainButton("My Symptoms", 8);
 var bActions = createMainButton("My Suggested Actions", 9);
 
+// Need to be able to use app in the button methods for dialogs
+using IApplication app = Application.Create();
+
 bTrack.Accepting += (s, e) => {
 	var elements = new List<View>();
 	var labelWidth = data.Symptoms.Select(x => x.Name.Count()).Max() + 1;
@@ -189,6 +192,12 @@ bPreviousDays.Accepting += (s, e) => {
 
 bExportCSV.Accepting += (s, e) => {
 	var exportFilePath = Path.Combine(exportPath, $"{data.Name} Tracked Symptoms {DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")}.csv");
+	var saveDialog = new SaveDialog {
+		Path = exportFilePath,
+	};
+	app.Run(saveDialog);
+	if (saveDialog.FileName is null) return;
+	exportFilePath = saveDialog.FileName;
 	var columns = data.Symptoms.Select(x => x.Name).Distinct().OrderBy(x => x).ToList();
 	columns.Insert(0, "Date");
 	columns.Add("Score");
@@ -211,7 +220,6 @@ bExportCSV.Accepting += (s, e) => {
 };
 
 navigateForward(mainElements);
-using IApplication app = Application.Create();
 app.Init();
 app.Run(window);
 
