@@ -9,7 +9,9 @@ using Terminal.Gui.Views;
 var configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "symptom-tracker");
 var dataFileName = "data.json";
 var notesPath = Path.Combine(configPath, "notes");
-var exportPath = Path.Combine(configPath, "export");
+var exportPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+if (!Directory.Exists(exportPath))
+	exportPath = Path.Combine(configPath, "export");
 var dataPath = Path.Combine(configPath, dataFileName);
 var logPath = Path.Combine(configPath, "log.txt");
 if (!Directory.Exists(configPath))
@@ -186,7 +188,7 @@ bPreviousDays.Accepting += (s, e) => {
 };
 
 bExportCSV.Accepting += (s, e) => {
-	var exportFilePath = Path.Combine(exportPath, $"{DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")}.csv");
+	var exportFilePath = Path.Combine(exportPath, $"{data.Name} Tracked Symptoms {DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")}.csv");
 	var columns = data.Symptoms.Select(x => x.Name).Distinct().OrderBy(x => x).ToList();
 	columns.Insert(0, "Date");
 	columns.Add("Score");
